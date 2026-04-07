@@ -1,0 +1,86 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String     @id @default(cuid())
+  googleId  String     @unique
+  email     String     @unique
+  name      String
+  avatarUrl String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  campaigns Campaign[]
+}
+
+model Sender {
+  id        String     @id @default(cuid())
+  name      String
+  email     String     @unique
+  fromName  String?
+  smtpHost  String
+  smtpPort  Int
+  smtpUser  String
+  smtpPass  String
+  secure    Boolean    @default(false)
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  campaigns Campaign[]
+  emails    EmailJob[]
+}
+
+model Campaign {
+  id              String     @id @default(cuid())
+  userId          String
+  senderId        String
+  subject         String
+  body            String
+  startTime       DateTime
+  delayBetweenMs  Int
+  hourlyLimit     Int
+  totalRecipients Int
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  sender          Sender     @relation(fields: [senderId], references: [id])
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails          EmailJob[]
+
+  @@index([userId, createdAt])
+}
+
+model EmailJob {
+  id                 String      @id @default(cuid())
+  campaignId         String
+  senderId           String
+  recipientEmail     String
+  subject            String
+  body               String
+  scheduledAt        DateTime
+  sentAt             DateTime?
+  failedAt           DateTime?
+  status             EmailStatus @default(SCHEDULED)
+  errorMessage       String?
+  providerMessageId  String?
+  etherealPreviewUrl String?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  campaign           Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sender             Sender      @relation(fields: [senderId], references: [id])
+
+  @@index([status, scheduledAt])
+  @@index([campaignId, scheduledAt])
+}
+
+enum EmailStatus {
+  SCHEDULED
+  SENT
+  FAILED
+}
