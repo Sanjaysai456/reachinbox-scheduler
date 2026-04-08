@@ -59,26 +59,34 @@ Ensure you have a valid Postgres schema deployed and an isolated Redis container
 ### 2. Backend Environment Setup (`/backend/.env`)
 Create a `.env` in the `/backend` folder:
 ```env
-PORT=3000
+PORT=8000
+FRONTEND_URL=http://localhost:5173
 DATABASE_URL="postgresql://user:password@localhost:5432/reachinboxdb?schema=public"
 DIRECT_URL="postgresql://user:password@localhost:5432/reachinboxdb?schema=public"
 
 # Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
+REDIS_URL=redis://localhost:6379
+
+# Auth & Security
+JWT_SECRET="your-256-bit-secret-here"
+GOOGLE_CLIENT_ID="[Your-Google-Client-Id-Here]"
 
 # BullMQ Config
-QUEUE_NAME="email-queue"
+QUEUE_NAME="email-send"
 WORKER_CONCURRENCY=5
 
-# Google Auth Config (used for frontend verification securely)
-GOOGLE_CLIENT_ID="[Your-Google-Client-Id-Here]"
+# Scheduling Defaults
+DEFAULT_DELAY_BETWEEN_EMAILS_MS=2000
+DEFAULT_HOURLY_LIMIT=120
+
+# SMTP Senders (JSON Array)
+SMTP_SENDERS_JSON='[{"name":"Sender 1","email":"your-ethereal-email@ethereal.email","fromName":"ReachInbox Sender 1","smtpHost":"smtp.ethereal.email","smtpPort":587,"smtpUser":"your-ethereal-email-user","smtpPass":"your-ethereal-pass","secure":false}]'
 ```
 
 ### 3. Frontend Environment Setup (`/frontend/.env`)
 Create a `.env` in the `/frontend` folder:
 ```env
-VITE_API_URL=http://localhost:3000
+VITE_API_BASE_URL=http://localhost:8000
 VITE_GOOGLE_CLIENT_ID="[Your-Google-Client-Id-Here]"
 ```
 
@@ -96,15 +104,22 @@ This script cleanly registers a new Sender automatically via Ethereal SMTP insid
 
 ## 🏃 Implementation Guide
 
-### Running The Backend API Server & Worker
+### 1. Start Infrastructure
+Ensure you have Docker installed and running. Start the required Database and Redis services:
+```bash
+docker-compose up -d
+```
+
+### 2. Running The Backend API Server & Worker
 Open a new terminal inside the `/backend` folder:
 1. `npm install`
 2. `npm run prisma:generate` (Generate Typed Prisma Client)
 3. `npm run prisma:migrate` (Sync schema to DB)
-4. `npm run dev` (Starts the core Express.js Scheduler API)
-5. `npm run worker:dev` (Open a separate terminal - Starts the BullMQ process worker)
+4. `npm run ethereal:generate` (Register a test sender)
+5. `npm run dev` (Starts the core Express.js Scheduler API on `http://localhost:8000`)
+6. `npm run worker:dev` (Open a separate terminal - Starts the BullMQ process worker)
 
-### Running The Frontend Dashboard
+### 3. Running The Frontend Dashboard
 Open a new terminal inside the `/frontend` folder:
 1. `npm install`
 2. `npm run dev` (Spins up Vite UI server on `http://localhost:5173`)
