@@ -37,7 +37,7 @@ startWorker().catch(async (error) => {
   process.exit(1);
 });
 
-const PORT = 10000;
+const PORT = process.env.PORT || 10000;
 http.createServer((req, res) => {
   res.writeHead(200);
   res.end("Worker is running and listening for jobs!");
