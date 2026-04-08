@@ -68,7 +68,7 @@ export const ComposeModal = ({
           subject,
           body,
           recipients,
-          startTime: new Date(startTime).toISOString(),
+          startTime,
           delayBetweenMs,
           hourlyLimit,
         }),
