@@ -55,7 +55,7 @@ export const reserveEmailSlot = async ({
   )) as [number, number, number];
 
   return {
-    scheduledAt: new Date(scheduledAt),
-    hourBucket: new Date(hourBucket),
+    scheduledAt: new Date(Number(scheduledAt)),
+hourBucket: new Date(Number(hourBucket)),
   };
 };

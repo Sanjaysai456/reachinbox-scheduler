@@ -16,14 +16,27 @@ emailRouter.use(requireAuth);
 emailRouter.post("/schedule", async (req, res, next) => {
   try {
     const payload = scheduleEmailSchema.parse(req.body);
-    const recipients = [...new Set(payload.recipients.map((email) => email.toLowerCase()))];
+
+    const recipients = [
+      ...new Set(payload.recipients.map((email) => email.toLowerCase())),
+    ];
+
+   
+    const startTime = new Date(payload.startTime);
+    startTime.setMinutes(
+      startTime.getMinutes() - startTime.getTimezoneOffset()
+    );
+
     const response = await scheduleEmailBatch({
       userId: req.user!.id,
       subject: payload.subject,
       body: payload.body,
       recipients,
-      startTime: new Date(payload.startTime),
-      delayBetweenMs: Math.max(payload.delayBetweenMs, env.DEFAULT_DELAY_BETWEEN_EMAILS_MS),
+      startTime,
+      delayBetweenMs: Math.max(
+        payload.delayBetweenMs,
+        env.DEFAULT_DELAY_BETWEEN_EMAILS_MS
+      ),
       hourlyLimit: Math.min(payload.hourlyLimit, env.DEFAULT_HOURLY_LIMIT),
     });
 

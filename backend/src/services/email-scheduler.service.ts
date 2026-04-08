@@ -43,7 +43,7 @@ export const scheduleEmailBatch = async ({
   for (const recipientEmail of recipients) {
     const slot = await reserveEmailSlot({
       senderId: sender.id,
-      desiredAt: startTime.getTime(),
+      desiredAt: startTime.valueOf(),
       delayMs: delayBetweenMs,
       hourlyLimit,
     });
