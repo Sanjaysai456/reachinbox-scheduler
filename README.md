@@ -2,7 +2,7 @@
 
 > [!WARNING]
 > **Production Deployment Notice**
-> Due to pricing limits on Render, we were only able to deploy the frontend and backend API servers to the live production environment. The separate background worker node could not be deployed concurrently. Because of this, delayed emails will **not** process in the live URL. 
+> Due to pricing limits on The Render, we were only able to deploy the frontend and backend API servers to the live production environment. The separate background worker node could not be deployed concurrently. Because of this, delayed emails will **not** process in the live URL. 
 > 
 > **🎥 Watch the Local Demonstration Video:** 
 > Please watch the attached local demonstration video to see the scheduling worker processing correctly in action!
