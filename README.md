@@ -1,5 +1,11 @@
 # ReachInbox Email Scheduler
 
+> [!WARNING]
+> **Production Deployment Notice**
+> Due to pricing limits on Render, we were only able to deploy the frontend and backend API servers to the live production environment. The separate background worker node could not be deployed concurrently. Because of this, delayed emails will **not** process in the live URL. 
+> 
+> **Please watch the attached local demonstration video to see the scheduling worker processing correctly in action!** 
+
 A production-grade email scheduler service and dashboard for bulk email outreach, built strictly adhering to the ReachInbox intern assignment guidelines.
 
 ## 🚀 Features Implemented
