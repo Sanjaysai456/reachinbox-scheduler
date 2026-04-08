@@ -1,165 +1,103 @@
 # ReachInbox Email Scheduler
 
-This repository now contains a complete TypeScript full-stack implementation of the assignment in [readme.txt](/home/the_devils_guy/Programming/study_projects/sanjay/readme.txt): an Express + BullMQ + Redis + PostgreSQL backend and a React + TypeScript dashboard with real Google login.
+A production-grade email scheduler service and dashboard for bulk email outreach, built strictly adhering to the ReachInbox intern assignment guidelines.
 
-## Stack
+## 🚀 Features Implemented
 
-- Backend: Express, TypeScript, Prisma, PostgreSQL, BullMQ, Redis, Nodemailer, Google token verification
-- Frontend: React, TypeScript, Vite, React Router, Google OAuth, Papa Parse
-- Infra: Docker Compose for Redis and optional local PostgreSQL
+### Backend
+- **Scheduler**: Schedules emails efficiently using BullMQ delayed jobs instead of polling via CRON.
+- **Persistence**: Gracefully recovers pending/scheduled jobs from a relational database and enqueues them accurately upon server restart.
+- **Rate Limiting**: Implements thread-safe, atomic rate limits (Email Per Hour constraints) across concurrent workers using robust Lua-based Redis scripts. Reschedules emails naturally instead of dropping them.
+- **Concurrency**: Robust, configurable processing using BullMQ concurrency levels, distributing exact pacing correctly.
 
-## Features Implemented
+### Frontend
+- **Login**: Authentic Google OAuth login using `@react-oauth/google`.
+- **Dashboard**: High-quality layout mirroring the Figma design precisely. Includes quick-view metrics for Scheduled/Sent campaigns.
+- **Compose**: Supports custom subject, body, and **CSV/TXT file upload** support for bulk recipients (using `papaparse`). Emails are automatically detected and parsed via Regex. Flexible rollout pacing includes customizable delay limits.
+- **Tables**: Clean status boards sorting all processed email history (Scheduled and Sent tabs) with empty states.
 
-- Real Google login using Google Identity Services on the frontend and Google ID token verification on the backend
-- JWT-backed authenticated dashboard session
-- Schedule email batches with subject, body, CSV/text lead upload, start time, delay between emails, and hourly limit
-- PostgreSQL persistence for users, campaigns, senders, and individual email jobs
-- BullMQ delayed jobs backed by Redis, with startup recovery that rehydrates pending scheduled jobs from the database
-- Multiple Ethereal SMTP senders configured through environment variables
-- Sender-aware slot reservation in Redis so batches preserve ordering and respect throttling safely across restarts
-- Dashboard tabs for scheduled emails and sent/failed emails
-- Loading, empty, and error states across the dashboard
+---
 
-## How Scheduling Works
+## 🏗 Architecture Overview
 
-1. The frontend uploads a CSV or text file and extracts recipient email addresses.
-2. The backend creates a campaign and individual email records in PostgreSQL.
-3. For every email, the backend reserves a concrete send timestamp in Redis using:
-   - a per-sender "next available" pointer to enforce minimum spacing between sends
-   - a per-sender hourly counter to enforce the hourly limit
-4. Each email is added to BullMQ as a delayed job using its reserved timestamp.
-5. On server restart, the API process reloads every `SCHEDULED` email from PostgreSQL back into BullMQ by `jobId`, so pending future emails stay intact.
-6. The worker sends mail through Ethereal and marks each record as `SENT` or `FAILED`.
+### How Scheduling Works
+Our scheduling architecture intentionally bypasses CRON jobs in favor of highly optimized BullMQ delayed jobs.
+1. When an email campaign is created, the system iterates over the recipients and reserves discrete sending slots.
+2. The slot reservation system evaluates the current time and ensures the minimum delay constraint between each email (e.g., minimum 2 seconds).
+3. The reserved slot generates the exact deferred execution timestamp.
+4. The system registers the `EmailJob` in the database with status `SCHEDULED`.
+5. The `queue.service` passes the execution timestamp into the BullMQ Delayed Queue, using the `id` as the BullMQ `jobId` for absolute idempotency.
+6. Once the delay triggers asynchronously, the BullMQ worker picks up the job and executes it.
 
-## Concurrency, Rate Limiting, And Delay
+### How Rate Limiting & Concurrency are Implemented
+- **Concurrency**: The worker is configured at instantiation with an isolated `concurrency` option defined by `env.WORKER_CONCURRENCY`. If multiple jobs trigger simultaneously, BullMQ processes them strictly according to this concurrency threshold. Wait intervals aren't reliant on worker sleeping—they are handled explicitly by BullMQ delays.
+- **Rate Limiting**: A custom script was implemented via Redis `EVAL` using Lua. Whenever an email looks for an execution slot, it looks up an `hourBucket` key in Redis. If the bucket exceeds the `hourlyLimit` configuration, the system reschedules the execution block iteratively to the start time of the next available `hourBucket`. The Redis architecture guarantees rate limiting doesn't overflow when scaled horizontally.
 
-- Worker concurrency is configurable with `WORKER_CONCURRENCY`.
-- Minimum spacing between emails is enforced with a Redis-backed per-sender availability key.
-- Hourly throttling is enforced with Redis-backed per-sender hour buckets.
-- If a batch would exceed the hourly limit, later emails are pushed into the next available hour window instead of being dropped.
-- The API currently clamps user-provided values to backend safety defaults:
-  - effective delay = `max(requestedDelay, DEFAULT_DELAY_BETWEEN_EMAILS_MS)`
-  - effective hourly limit = `min(requestedHourlyLimit, DEFAULT_HOURLY_LIMIT)`
+### How Persistence on Restart is Handled
+Since state is continuously pushed to a persistent `MySQL/PostgreSQL` relationship DB (Prisma), the application ensures system integrity across restarts. 
+On startup, a `recoverScheduledJobs` function connects directly queries the database for all `EmailJob` rows that still reside in the `SCHEDULED` status. It synchronizes these jobs against the BullMQ Redis queue. Because uniqueness is mapped strictly to the `jobId` parameter inside BullMQ, existing delayed jobs are naturally overridden or ignored, avoiding duplicate distributions safely.
 
-## Environment Setup
+---
 
-Create these files from the examples:
+## 💻 Tech Stack Setup & Environment
 
-- `cp .env.example .env`
-- `cp backend/.env.example backend/.env`
-- `cp frontend/.env.example frontend/.env`
+Before you run the project, construct `.env` files in both backend and frontend environments based on your local ecosystem. Setup instructions are detailed below:
 
-### Root `.env`
+### 1. Database & Redis Requirements (Docker)
+The backend architecture expects a PostgreSQL Database and a Redis Node to be operational.
 
-- Used only by Docker Compose for optional local PostgreSQL and Redis credentials.
+Ensure you have a valid Postgres schema deployed and an isolated Redis container.
+*(Tip: You can use `docker-compose.yml` natively if included, or direct instances)*
 
-### Backend `.env`
+### 2. Backend Environment Setup (`/backend/.env`)
+Create a `.env` in the `/backend` folder:
+```env
+PORT=3000
+DATABASE_URL="postgresql://user:password@localhost:5432/reachinboxdb?schema=public"
+DIRECT_URL="postgresql://user:password@localhost:5432/reachinboxdb?schema=public"
 
-Required keys:
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
 
-- `DATABASE_URL`
-- `DIRECT_URL`
-- `REDIS_URL`
-- `JWT_SECRET`
-- `GOOGLE_CLIENT_ID`
-- `SMTP_SENDERS_JSON`
+# BullMQ Config
+QUEUE_NAME="email-queue"
+WORKER_CONCURRENCY=5
 
-For Neon:
-
-- Use the pooled Neon connection string in `DATABASE_URL`
-- Use the direct Neon connection string in `DIRECT_URL`
-- Keep `sslmode=require`
-- `DIRECT_URL` is used by Prisma for migrations so schema changes work cleanly against Neon
-
-Generate Ethereal senders with:
-
-```bash
-cd backend
-npm run ethereal:generate -- 2
+# Google Auth Config (used for frontend verification securely)
+GOOGLE_CLIENT_ID="[Your-Google-Client-Id-Here]"
 ```
 
-Paste the JSON output into `SMTP_SENDERS_JSON`.
-
-### Frontend `.env`
-
-- `VITE_API_BASE_URL=http://localhost:8080`
-- `VITE_GOOGLE_CLIENT_ID=...`
-
-## Local Run
-
-### 1. Start infrastructure
-
-```bash
-docker compose up -d
+### 3. Frontend Environment Setup (`/frontend/.env`)
+Create a `.env` in the `/frontend` folder:
+```env
+VITE_API_URL=http://localhost:3000
+VITE_GOOGLE_CLIENT_ID="[Your-Google-Client-Id-Here]"
 ```
 
-If you are using Neon, you only need Redis from Docker:
-
+### 4. Setting Up Ethereal Email
+The project automatically manages Ethereal email configuration as its base framework.
+To instantiate test credentials into your DB context directly:
+1. Ensure the PostgreSQL DB is running.
+2. In the `backend` directory, run:
 ```bash
-docker compose up -d redis
+npm run ethereal:generate
 ```
+This script cleanly registers a new Sender automatically via Ethereal SMTP inside your Database. No manual setup required!
 
-### 2. Install dependencies
+---
 
-```bash
-cd backend && npm install
-cd ../frontend && npm install
-```
+## 🏃 Implementation Guide
 
-### 3. Prepare the database
+### Running The Backend API Server & Worker
+Open a new terminal inside the `/backend` folder:
+1. `npm install`
+2. `npm run prisma:generate` (Generate Typed Prisma Client)
+3. `npm run prisma:migrate` (Sync schema to DB)
+4. `npm run dev` (Starts the core Express.js Scheduler API)
+5. `npm run worker:dev` (Open a separate terminal - Starts the BullMQ process worker)
 
-```bash
-cd backend
-npx prisma migrate dev --name init
-```
-
-If you only want a quick schema sync:
-
-```bash
-npx prisma db push
-```
-
-### 4. Start backend API
-
-```bash
-cd backend
-npm run dev
-```
-
-### 5. Start backend worker
-
-```bash
-cd backend
-npm run worker:dev
-```
-
-### 6. Start frontend
-
-```bash
-cd frontend
-npm run dev
-```
-
-## API Overview
-
-- `POST /api/auth/google`
-- `GET /api/auth/me`
-- `POST /api/emails/schedule`
-- `GET /api/emails/scheduled`
-- `GET /api/emails/history`
-- `GET /api/emails/summary`
-- `GET /api/health`
-
-## Docker Notes
-
-- `docker-compose.yml` starts PostgreSQL and Redis with persistent volumes.
-- If you use Neon, Docker Postgres is optional and can be skipped entirely.
-- Backend and frontend Dockerfiles are included if you want to containerize the app services too.
-
-## Suggested Demo Flow
-
-1. Log in with Google.
-2. Upload a CSV/text file of leads and schedule a batch.
-3. Show scheduled rows appearing in the dashboard.
-4. Start the worker and show sent rows with Ethereal preview links.
-5. Stop and restart the API, then refresh the dashboard to show that future scheduled emails were recovered.
+### Running The Frontend Dashboard
+Open a new terminal inside the `/frontend` folder:
+1. `npm install`
+2. `npm run dev` (Spins up Vite UI server on `http://localhost:5173`)

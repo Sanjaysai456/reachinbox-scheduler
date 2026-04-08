@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "worker:dev": "tsx watch src/workers/email.worker.ts",
-    "build": "prisma generate && tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "worker:start": "node dist/workers/email.worker.js",
     "prisma:generate": "prisma generate",
