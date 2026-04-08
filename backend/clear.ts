@@ -8,11 +8,11 @@ async function main() {
   console.log("Cleaning Database...");
   await prisma.emailJob.deleteMany();
   await prisma.campaign.deleteMany();
-  console.log("✅ Cleared all Emails & Campaigns from DB.");
+  console.log("Cleared all Emails & Campaigns from DB.");
 
   console.log("Flushing Redis Queues & Rate Limits...");
   await redis.flushall();
-  console.log("✅ Cleared BullMQ and Redis state.");
+  console.log("Cleared BullMQ and Redis state.");
 }
 
 main()

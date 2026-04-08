@@ -38,9 +38,20 @@ startWorker().catch(async (error) => {
 });
 
 const PORT = process.env.PORT || 10000;
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
   res.writeHead(200);
   res.end("Worker is running and listening for jobs!");
-}).listen(PORT, () => {
+});
+
+server.listen(PORT, () => {
   console.log(`Dummy server listening on port ${PORT} to satisfy Render`);
+});
+
+server.on("error", (err: any) => {
+  if (err.code === "EADDRINUSE") {
+    console.log(`Port ${err.port} is in use. Falling back to a random port for worker dummy server.`);
+    server.listen(0);
+  } else {
+    console.error("Dummy server error:", err);
+  }
 });
