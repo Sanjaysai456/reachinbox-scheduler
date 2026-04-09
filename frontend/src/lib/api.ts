@@ -25,6 +25,7 @@ export const apiRequest = async <T>(path: string, options: RequestOptions = {}) 
   const response = await fetch(`${appConfig.apiBaseUrl}${path}`, {
     ...options,
     headers,
+    credentials: "include", // ✅ ADD THIS
   });
 
   const raw = (await response.json().catch(() => null)) as { message?: string } | null;

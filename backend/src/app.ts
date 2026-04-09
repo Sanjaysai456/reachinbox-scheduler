@@ -7,9 +7,24 @@ import { env } from "./config/env";
 import { apiRouter } from "./routes";
 
 export const app = express();
+app.set("trust proxy", 1);
 
-app.use(cors());
-app.use(helmet());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://reachinbox-scheduler-jade.vercel.app",
+    ],
+    credentials: true,
+  })
+);
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false,
+  })
+);
+
 app.use(express.json({ limit: "2mb" }));
 app.use(morgan("dev"));
 
